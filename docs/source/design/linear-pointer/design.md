@@ -102,6 +102,23 @@ All of the noted resolutions rely on additional paltform features:
 
 **Response:** It's possible anyway. Use of this feature is optional.
 
+#### Coinselection will be slow.
+
+**Concern:** We'll need to join on other tables to perform coinselection, making it slower.
+
+**Response:** This is probably not true in most cases. Take the existing coinselection code from `CashSelectionH2Impl.kt`:
+
+```sql
+SELECT vs.transaction_id, vs.output_index, ccs.pennies, SET(@t, ifnull(@t,0)+ccs.pennies) total_pennies, vs.lock_id
+FROM vault_states AS vs, contract_cash_states AS ccs
+WHERE vs.transaction_id = ccs.transaction_id AND vs.output_index = ccs.output_index
+AND vs.state_status = 0
+AND vs.relevancy_status = 0
+AND ccs.ccy_code = ? and @t < ?
+AND (vs.lock_id = ? OR vs.lock_id is null)
+```
+
+Notice that the only property required which is not accessible from the `LinearPointer` is the `ccy_code`. This is not necessarily a problem though, as the `linearId` specified in the pointer can be used as a proxy for the `ccy_code` or "token type".
 
 
 
