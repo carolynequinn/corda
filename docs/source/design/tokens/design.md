@@ -39,7 +39,7 @@ The same principle applies for equity and debt, which are agreements between com
 
 ### What is an agreement in Corda?
 
-Any state object which contains two or more distinct Party (or AbstractParty ) objects in the state definition. Examples:
+Any state object which contains two or more distinct `Party` (or `AbstractParty`) objects in the state definition. Examples:
 
 * `issuer` and `owner` in the cash state
 * two `participants` in a `LinearState` representing an interest rate swap
@@ -136,7 +136,7 @@ Both of the above problems can be resolved by adding the pointed-to `LinearState
 
 #### FungibleToken
 
-                   ```kotlin
+```kotlin
 open class FungibleToken<T : TokenType>(
     override val amount: Amount<TokenType>,
 	override val owner: AbstractParty
@@ -150,7 +150,7 @@ open class FungibleToken<T : TokenType>(
   		return CommandAndState(Commands.Move(), copy(owner = newOwner))
 	}
 }
-                   ```
+```
 
 `FungibleToken` is something that can be split and merged. It contains the following properties:
 
@@ -163,7 +163,9 @@ It is easy to see that the `FungibleToken` is only concerned with which party "o
 The `FungibleToken` class is defined as open so developers can create their own sub-classes,
 e.g. one which incorporates owner whitelists, for example.
 
-`FungibleToken` coupled with `TokenType` is the Corda version of **ERC-20**. The other part of the standard which is out of scope of things document are the flows to issue, move and redeem tokens. This class can be used to represent any type of fungible financial instrument.
+`FungibleToken` coupled with `TokenType` is the Corda version of **ERC-20**. The other part of the standard which is out of scope of things document are the flows to issue, move and redeem tokens as well as the types used to define `TokenType`s.
+
+This class can be used to represent any type of fungible financial instrument.
 
 #### TokenType
 
@@ -283,7 +285,12 @@ Here, the `TokenType.Definition` is linked to the `FungibleState` via the `Token
 
 We cannot link the `TokenType.Definition` by `StateRef` as the `FungibleState` would require updating each time the `TokenType.Definition` is updated! `resolve` allows developers to resolve the `linearId` to the `TokenType.Definition` state inside a flow. Conceptually, this is similar to the process where a `StateRef` is resolved to a `StateAndRef`.
 
-![](pointer.png)
+![pointer](pointer.png)
+
+**TODO:**
+
+* Add a point about coin selection. The `linearId` is all that is required to select `TokenType.Pointer` s. The pointer only needs to be resolved when developers need access to data contained within the `TokenType.Definition`. E.g. if the token info needs displaying in the front-end of an app, or if the issuer `Party` is required for whatever reason. As such, no joins need to be performed for simple coin selection, where X amount of a set of `TokenType` needs to be selected. If the selection needs to be more complicated. When querying, the token symbol can be resolved to a `linearId` which will be used by the vault to select the coins.
+* Need to benchmark coin selection with use of `TokenType.Pointer`.
 
 #### Representing non-fungible tokens
 
@@ -315,7 +322,7 @@ These tables explain how common financial instruments and things map to the four
 
 ![taxonomy](taxonomy.png)
 
-### Example tokenDescription interfaces
+### Example `TokenDescription` interfaces
 
 Here's a list of some example `TokenDescription`s which can be embedded in `FungibleToken` or `FungibleAgreement` .
 
@@ -380,3 +387,8 @@ val gbpElectronicMoney = ElectronicMoney(gbpBankDeposit, E_MONEY_ISSUER)
 ```
 
 When used in `FungibleToken`s, `TokenDescription`s are composed into `TokenType.Definition`s.
+
+**TODO:**
+
+* Explain how other types of composition would work. For example, where a `TokenDescription` comprises multiple other `TokenDescription`s. What are some good examples? Are there any?
+* Explain how "acceptable contracts" will work for the obligation contract. "I'll accept payment in any of the specified `TokenType`s".
