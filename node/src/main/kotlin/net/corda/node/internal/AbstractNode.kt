@@ -51,6 +51,7 @@ import net.corda.node.services.events.NodeSchedulerService
 import net.corda.node.services.events.ScheduledActivityObserver
 import net.corda.node.services.identity.PersistentIdentityService
 import net.corda.node.services.keys.*
+import net.corda.node.services.keys.cryptoServices.BCCryptoService
 import net.corda.node.services.messaging.DeduplicationHandler
 import net.corda.node.services.messaging.MessagingService
 import net.corda.node.services.network.NetworkMapClient
@@ -256,8 +257,9 @@ abstract class AbstractNode<S>(val configuration: NodeConfiguration,
         if (configuration.devMode) {
             // TODO use CryptoService in devMode as well, at the moment we reuse the signingCertificateStore to generate dev keys.
             configuration.configureWithDevSSLCertificate()
-            println("Testing Cryptoservice " + cryptoService.enlist())
-            println("Testing File " + configuration.signingCertificateStore.get().value.aliases().asSequence().toList())
+            if (cryptoService is BCCryptoService) {
+                cryptoService.resyncKeystore()
+            }
         }
         return validateKeyStores()
     }
@@ -297,7 +299,6 @@ abstract class AbstractNode<S>(val configuration: NodeConfiguration,
 
         val trustRoot = initKeyStores()
         val nodeCa = configuration.signingCertificateStore.get()[CORDA_CLIENT_CA]
-        println("nodeCa " + cryptoService.enlist())
         initialiseJVMAgents()
 
         schemaService.mappedSchemasWarnings().forEach {
@@ -420,7 +421,6 @@ abstract class AbstractNode<S>(val configuration: NodeConfiguration,
         )
 
         val nodeInfoFromDb = getPreviousNodeInfoIfPresent(identity)
-
 
         val nodeInfo = if (potentialNodeInfo == nodeInfoFromDb?.copy(serial = 0)) {
             // The node info hasn't changed. We use the one from the database to preserve the serial.
@@ -856,7 +856,7 @@ abstract class AbstractNode<S>(val configuration: NodeConfiguration,
                                                  networkParameters: NetworkParameters)
 
     private fun obtainIdentity(notaryConfig: NotaryConfig?): Pair<PartyAndCertificate, KeyPair> {
-        val keyStore = configuration.signingCertificateStore.get()
+        val keyStore = configuration.signingCertificateStore.get(createNew = true)
         val (id, singleName) = if (notaryConfig == null || !notaryConfig.isClusterConfig) {
             // Node's main identity or if it's a single node notary.
             Pair(NODE_IDENTITY_ALIAS_PREFIX, configuration.myLegalName)
@@ -866,7 +866,6 @@ abstract class AbstractNode<S>(val configuration: NodeConfiguration,
         }
         // TODO: Integrate with Key management service?
         val privateKeyAlias = "$id-private-key"
-        println("List " + cryptoService.enlist())
         if (!cryptoService.containsKey(privateKeyAlias)) {
             // We shouldn't have a distributed notary at this stage, so singleName should NOT be null.
             requireNotNull(singleName) {
@@ -878,11 +877,13 @@ abstract class AbstractNode<S>(val configuration: NodeConfiguration,
 
         val (x509Cert, keyPair) = keyStore.query { getCertificateAndKeyPair(privateKeyAlias) }
 
+        val signingCertificateStore = configuration.signingCertificateStore.get()
+
         // TODO: Use configuration to indicate composite key should be used instead of public key for the identity.
         val compositeKeyAlias = "$id-composite-key"
-        val certificates = if (compositeKeyAlias in keyStore) {
+        val certificates = if (signingCertificateStore.contains(compositeKeyAlias)) {
             // Use composite key instead if it exists.
-            val certificate = keyStore[compositeKeyAlias]
+            val certificate = signingCertificateStore[compositeKeyAlias]
             // We have to create the certificate chain for the composite key manually, this is because we don't have a keystore
             // provider that understand compositeKey-privateKey combo. The cert chain is created using the composite key certificate +
             // the tail of the private key certificates, as they are both signed by the same certificate chain.
