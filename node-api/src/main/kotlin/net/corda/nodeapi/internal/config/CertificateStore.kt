@@ -86,7 +86,6 @@ interface CertificateStore : Iterable<Pair<String, X509Certificate>> {
             DummyKeysAndCerts.DUMMY_ECDSAR1_KEYPAIR.private
         }
         this.value.setPrivateKey(alias, privateKey, certificates)
-        this.value.save()
     }
 }
 
