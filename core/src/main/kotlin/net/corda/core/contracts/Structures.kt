@@ -12,7 +12,8 @@ import net.corda.core.flows.FlowLogicRefFactory
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
 import net.corda.core.node.ServiceHub
-import net.corda.core.node.ServicesForResolution
+import net.corda.core.node.services.queryBy
+import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.serialization.serialize
 import net.corda.core.transactions.LedgerTransaction
@@ -358,9 +359,12 @@ interface LinearPointer {
     /**
      * Resolves a [LinearPointer] using the [UniqueIdentifier] contained in the [pointer] property. returns a
      * [StateAndRef] containing the latest version of the [LinearState] that the node calling [resolve] is aware of.
-     * There are two issues to note with [LinearPointer]:
      *
-     * @param services a minimal [ServiceHub] implementation to resolve the
+     * @param services a [ServiceHub] implementation is required to perform a vault query.
      */
-    fun resolve(services: ServicesForResolution): StateAndRef<LinearState>
+    fun resolve(services: ServiceHub): StateAndRef<LinearState>? {
+        val query = QueryCriteria.LinearStateQueryCriteria(linearId = listOf(pointer))
+        val result = services.vaultService.queryBy<LinearState>(query)
+        return result.states.singleOrNull()
+    }
 }
